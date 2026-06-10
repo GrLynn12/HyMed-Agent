@@ -1,0 +1,22 @@
+# Python caches and test output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local secrets and user state
+local_config.py
+tmp_data/user_credentials.json
+tmp_data/user_memory.db
+
+# Large local models and generated indexes
+model/chinese-roberta-wwm-ext/
+model/best_roberta_rnn_model_ent_aug.pt
+vector_index/
+data/
+# Bundled database runtime and mutable logs
+neo4j-community-5.26.26/
+neo4j-community-5.26.26/logs/
+evaluation_reports/
+evaluation/
+# OS/editor files
+.DS_Store
