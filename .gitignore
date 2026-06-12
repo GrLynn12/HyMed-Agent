@@ -13,6 +13,7 @@ model/chinese-roberta-wwm-ext/
 model/best_roberta_rnn_model_ent_aug.pt
 vector_index/
 data/
+experiments/
 # Bundled database runtime and mutable logs
 neo4j-community-5.26.26/
 neo4j-community-5.26.26/logs/

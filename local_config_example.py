@@ -1,0 +1,8 @@
+"""本机私密配置。
+"""
+
+QWEN_API_KEY = "sk-xxx"
+NEO4J_PASSWORD = "xxx"
+EMBEDDING_MODEL_NAME = ""
+RERANKER_MODEL_NAME = ""
+DEVICE = ""

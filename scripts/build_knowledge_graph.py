@@ -55,7 +55,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="通过medical.json文件,创建一个知识图谱")
     parser.add_argument('--website', type=str, default="bolt://localhost:7687", help='neo4j的连接网站')
     parser.add_argument('--user', type=str, default=settings.NEO4J_USER, help='neo4j的用户名')
-    parser.add_argument('--password', type=str, default="rl021266", help='neo4j的密码')
+    parser.add_argument('--password', type=str, default=settings.NEO4J_PASSWORD, help='neo4j的密码')
     parser.add_argument('--dbname', type=str, default=settings.NEO4J_DBNAME, help='数据库名称')
     args = parser.parse_args()
 
@@ -87,11 +87,7 @@ if __name__ == "__main__":
     for i,data in enumerate(all_data):
         if (len(data) < 3):
             continue
-        # 修复：原代码使用 eval(data[:-1]) 解析每行 JSON：
-        #   1) eval 不安全；
-        #   2) 假设每行末尾必是 `,`，遇到最后一行（无尾逗号）会崩；
-        #   3) 遇行尾空白也会崩。
-        # 改为 rstrip + 去除末尾逗号 + json.loads。
+        # rstrip + 去除末尾逗号 + json.loads。
         line = data.rstrip().rstrip(',')
         try:
             data = json.loads(line)
@@ -135,7 +131,6 @@ if __name__ == "__main__":
 
         symptom = data.get("symptom",[])
         # 清洗症状名末尾的省略号（数据集偶尔有 'XXX症状...' 这种值）。
-        # 原代码 for i, sy in enumerate(symptom) 但只用 symptom[i]，sy 变量被忽略，逻辑混乱。
         symptom = [s[:-3] if isinstance(s, str) and s.endswith('...') else s for s in symptom]
         all_entity["疾病症状"].extend(symptom)
         if symptom:

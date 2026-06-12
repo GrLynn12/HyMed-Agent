@@ -1,9 +1,14 @@
-# HyMed-Agent
+# MediGuard-Agent
 
-基于千问 API、Neo4j、FAISS、LangGraph 和 SQLite 的医疗 Hybrid RAG 问答系统。
+在线医疗咨询作为数字医疗的重要延伸，对缓解医疗资源紧张、提供即时健康指导具有显著价值。然而，在临床医学等高风险领域，通用大模型暴露出两大致命缺陷：
 
-系统通过受控 ReAct 循环动态选择知识图谱和向量检索，并由 Harness
-限制工具预算、重复调用和医疗输出风险。Skills 为不同医疗任务提供按需加载的执行策略。
+1. **事实性幻觉**：模型易凭空捏造药物剂量或错误联结病理因果关系；
+2. **行为不可控性**：模型在缺乏充分证据支撑时倾向于“盲目自信作答”，而非主动终止或提示风险。
+医学咨询容错率极低，任何未经证实的输出都可能诱发严重的临床风险。因此，如何实现“回答有据、决策可控、记忆可信、风险可拦截”，成为生成式医疗助理走向临床工程落地的核心瓶颈。
+
+针对上述挑战，设计并实现了 **MediGuard-Agent** —— 一个证据驱动且运行时受控的医疗问答智能体。本系统放弃了传统的端到端自由生成模式，转而采用**结构化约束、多路检索协同与强风控拦截**的解耦架构，死守医疗安全的底线。
+
+![架构图](fig/main.png)
 
 > 医疗回答仅供知识参考，不替代医生诊断和治疗。
 
@@ -27,7 +32,7 @@
 ## 项目结构
 
 ```text
-RAGQnASystem/
+HyMed-Agent/
 ├── app.py                         # Streamlit 应用入口
 ├── medical_rag/                   # 在线应用代码
 │   ├── core/                      # 配置、日志、计算设备
@@ -77,24 +82,22 @@ RAGQnASystem/
 
 ```bash
 conda create -n ragag python=3.10
-conda activate ragag
+conda activate mediguard
 pip install -r requirements.txt
 ```
 
-## 配置千问
+## 配置密钥
 
 推荐在项目根目录创建 `local_config.py`：
 
 ```python
-"""本机私密配置，不提交到 Git。"""
-
-QWEN_API_KEY = "你的 DashScope API Key"
+QWEN_API_KEY = "你的 API Key"
 ```
 
 也可以使用环境变量：
 
 ```bash
-export QWEN_API_KEY="你的 DashScope API Key"
+export QWEN_API_KEY="你的API Key"
 ```
 
 读取优先级：
@@ -108,12 +111,18 @@ QWEN_API_KEY / DASHSCOPE_API_KEY 环境变量
 ## 启动服务
 
 ### 1. 启动 Neo4j
-
-如果使用项目内置 Neo4j：
+本项目使用 Neo4j Community 5.18.x（需要 JDK 17）。
+从[ Neo4j 官方下载页 ](https://example.com) 下载对应系统版本
+启动 Neo4j：
+# Linux 示例
 
 ```bash
-./neo4j-community-5.26.26/bin/neo4j start
+cd neo4j-community-5.18.1
+./bin/neo4j start
 ```
+
+浏览器打开 http://localhost:7474 ，使用默认账号 neo4j / neo4j 登录
+首次登录会要求修改密码——请记住你设置的新密码，后续步骤要用
 
 默认连接配置：
 
@@ -122,6 +131,54 @@ Bolt: bolt://localhost:7687
 Browser: http://localhost:7474
 Database: neo4j
 ```
+
+### 构建知识图谱
+>[!Warning]
+>build_up_graph.py 运行时会询问是否删除 Neo4j 中全部已有节点（输入 y 确认）。
+>请确保目标数据库是干净库或已备份！
+
+#### 执行命令：
+python scripts/build_knowledge_graph.py \
+  --website http://localhost:7474 \
+  --user neo4j \
+  --password <你的Neo4j密码> \
+  --dbname neo4j
+
+也可以通过local_config.py设置（推荐，避免密码出现在命令行历史）：
+
+#### 脚本做了什么：
+```text
+读取 data/medical_new_2.json（约 8808 条疾病记录）
+        ▼
+逐行解析 JSON
+        ├── 抽取实体，创建成点
+        │     ├── 疾病
+        │     ├── 药品
+        │     ├── 药品商
+        │     ├── 食物
+        │     ├── 症状
+        │     ├── 治疗方法
+        │     ├── 科室
+        │     └── 检查项目
+        │
+        ├── 抽取关系（疾病的症状、疾病使用药品、疾病宜吃食物 等），创建成边
+        ├── 生成 data/ent_aug/*.txt，保存实体名列表
+        ├── 生成 data/rel_aug.txt，保存关系
+        ▼
+导入 Neo4j 知识图谱
+```
+
+#### 验证知识图谱是否构建成功：
+在 Neo4j 浏览器（http://localhost:7474）中执行：
+
+MATCH (n) RETURN count(n)
+-- 期望结果：约 44,656 个节点
+
+MATCH ()-[r]->() RETURN count(r)
+-- 期望结果：约 312,159 条关系
+
+MATCH (a:疾病{名称:'高血压'}) RETURN a.疾病简介
+-- 期望结果：返回高血压的简介文本
 
 ### 2. 启动应用
 
